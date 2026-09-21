@@ -9,6 +9,23 @@ ALE loads it at world start, so no rebuild is needed.
 Installed for you by [Yu'lon](https://github.com/DadsMmoLab/dads-mmo-lab) from
 this repository.
 
+## Rested XP
+
+Sitting still also builds rested XP, the blue part of the XP bar. Ground or
+chair, any seat counts; bots are skipped. Moving, standing up or entering
+combat stops it and starts the wait over.
+
+| Key | Default | Meaning |
+|---|---|---|
+| `REST_XP_ENABLED` | `true` | `false` turns the feature off |
+| `REST_XP_DELAY` | `30` | seconds of sitting still before it starts |
+| `REST_XP_RATE` | `5.0` | percent of the current level's XP bar per minute |
+| `REST_XP_MAX_LEVELS` | `1.5` | stop at this many levels' worth |
+
+For scale, an inn gives 5 percent per eight hours; at the default a ten-minute
+break is worth half a level. The core's own ceiling (`Rate.Rest.MaxBonus`)
+always applies on top, and a max-level character gets none.
+
 ## Configuration
 
 Everything tunable is the `CONFIG` table at the top of the file, commented in

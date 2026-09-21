@@ -32,3 +32,11 @@ jobs:
       # fails when that line runs on the server.
       - name: luacheck
         run: luacheck $(git ls-files '*.lua')
+
+      # The script driven against a mock ALE: delay, rate, the resets, bots,
+      # chairs and both ceilings.
+      - name: Rested XP simulation
+        run: |
+          set -e
+          lua5.1 tests/rested_xp.lua SitMeansRest.lua
+          lua5.4 tests/rested_xp.lua SitMeansRest.lua
