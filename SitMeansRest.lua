@@ -26,8 +26,10 @@ local CONFIG = {
     REST_XP_RATE = 5.0,
 
     -- Stop building at this many levels' worth of rested XP. The core has its
-    -- own ceiling (1.5 levels unless Rate.Rest.MaxBonus says otherwise) and
-    -- that one always applies as well; lower this to keep inns worth a visit.
+    -- own ceiling and that one always applies as well: next-level XP times
+    -- Rate.Rest.MaxBonus / 2, which at the stock 1.5 is 0.75 of a level --
+    -- about fifteen minutes at the default rate. So this only bites when it
+    -- is set BELOW the core's; lower it to keep inns worth a visit.
     REST_XP_MAX_LEVELS = 1.5,
 }
 
@@ -49,6 +51,7 @@ local rest = {} -- [guidLow] = { x, y, eventId, phase }
 -- after DURATION while the player may sit on for minutes) and it counts
 -- chairs, which the buff does not.
 local seat = {} -- [guidLow] = { x, y, polls, building, full }
+                -- building/full only say which message was last shown
 
 local function StopResting(player, silent)
     local g = player:GetGUIDLow()
@@ -118,12 +121,17 @@ local function OnEmote(event, player, textEmote, emoteNum, guid)
     end
 end
 
+local restXPErrorShown = false
+
 -- One poll's worth of rested XP for one player. Called every POLL_INTERVAL
 -- for everyone online, so the cheap exits come first.
 local function BuildRestedXP(player)
     local g = player:GetGUIDLow()
 
-    if not SEATED[player:GetStandState()] or player:IsInCombat() or player:IsBot() then
+    -- Player:IsBot is newer than some mod-ale builds (added in #360); a
+    -- missing method is nil on the userdata, and then nobody is a bot.
+    if not SEATED[player:GetStandState()] or player:IsInCombat()
+       or (player.IsBot and player:IsBot()) then
         seat[g] = nil
         return
     end
@@ -139,7 +147,7 @@ local function BuildRestedXP(player)
     end
 
     state.polls = state.polls + 1
-    if state.full or state.polls * CONFIG.POLL_INTERVAL < CONFIG.REST_XP_DELAY * 1000 then
+    if state.polls * CONFIG.POLL_INTERVAL < CONFIG.REST_XP_DELAY * 1000 then
         return
     end
 
@@ -157,26 +165,37 @@ local function BuildRestedXP(player)
     -- The core clamps to its own ceiling and to zero at max level, so what
     -- was asked for is not what was given: read it back. No growth means
     -- one ceiling or the other has been reached.
+    --
+    -- Full is not latched. Rested XP is spent by any XP gained while seated
+    -- (a group kill, a quest turned in) and a level-up raises the ceiling,
+    -- so every poll asks again and building resumes by itself.
     local after = player:GetRestBonus()
     if after <= before then
-        state.full = true
-        if state.building then
+        if state.building and not state.full then
             player:SendAreaTriggerMessage("|cff00ff00You are fully rested.|r")
         end
+        state.full = true
         return
     end
 
-    if not state.building then
-        state.building = true
+    if not state.building or state.full then
         player:SendAreaTriggerMessage("|cff00ccffYou begin to feel rested.|r")
     end
+    state.building = true
+    state.full = false
 end
 
 -- X-key sitting sends a stand-state change, not a text emote, so poll for it.
 local function PollStandState(eventId, delay, repeats)
     for _, player in ipairs(GetPlayersInWorld()) do
+        -- Under pcall: an error here must not abort the loop and take the
+        -- regen buff below away from every player after this one.
         if CONFIG.REST_XP_ENABLED then
-            BuildRestedXP(player)
+            local ok, err = pcall(BuildRestedXP, player)
+            if not ok and not restXPErrorShown then
+                restXPErrorShown = true
+                print("SitMeansRest rested XP error: " .. tostring(err))
+            end
         end
 
         local sitting = player:GetStandState() == CONFIG.STAND_STATE_SIT

@@ -23,8 +23,10 @@ combat stops it and starts the wait over.
 | `REST_XP_MAX_LEVELS` | `1.5` | stop at this many levels' worth |
 
 For scale, an inn gives 5 percent per eight hours; at the default a ten-minute
-break is worth half a level. The core's own ceiling (`Rate.Rest.MaxBonus`)
-always applies on top, and a max-level character gets none.
+break is worth half a level. The core's own ceiling always applies on top:
+next-level XP x `Rate.Rest.MaxBonus` / 2, which at the stock 1.5 is 0.75 of a
+level, reached in about fifteen minutes. `REST_XP_MAX_LEVELS` only matters
+when set below that. A max-level character gets none.
 
 ## Configuration
 
