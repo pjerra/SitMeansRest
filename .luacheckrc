@@ -125,3 +125,6 @@ read_globals = {
 unused_args = false
 
 max_line_length = false
+
+-- The test stands in for ALE, so there it defines the globals the script reads.
+files["tests/"] = { globals = { "GetPlayersInWorld", "RegisterPlayerEvent", "CreateLuaEvent" } }
