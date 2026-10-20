@@ -40,3 +40,11 @@ jobs:
           set -e
           lua5.1 tests/rested_xp.lua SitMeansRest.lua
           lua5.4 tests/rested_xp.lua SitMeansRest.lua
+
+      # Eating and drinking: the regen buff must not throw real food or drink
+      # off the player (same food-and-drink slot in the core).
+      - name: Food and drink simulation
+        run: |
+          set -e
+          lua5.1 tests/food.lua SitMeansRest.lua
+          lua5.4 tests/food.lua SitMeansRest.lua
