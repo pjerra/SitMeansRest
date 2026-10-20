@@ -69,6 +69,57 @@ local function StopResting(player, silent)
     end
 end
 
+-- SpellSpecificType (SpellInfo.h): SPELL_SPECIFIC_FOOD, _DRINK and
+-- _FOOD_AND_DRINK. The core lets one of these sit on a player at a time, and
+-- the regen aura (Graccu's fruitcake) is food-and-drink itself: adding it
+-- while the player eats or drinks throws their real food or drink off them,
+-- and with it the Well Fed it would have given. Eating sits a player down,
+-- so without this check that happened every time anyone ate.
+local FOOD_OR_DRINK = { [19] = true, [20] = true, [21] = true }
+
+local function FindFood(player)
+    for _, aura in ipairs(player:GetAuras()) do
+        if aura:GetAuraId() ~= CONFIG.REGEN_AURA then
+            local info = aura:GetSpellInfo()
+            if info and FOOD_OR_DRINK[info:GetSpellSpecific()] then
+                return true
+            end
+        end
+    end
+    return false
+end
+
+local eatingErrorShown = false
+
+-- Unit:GetAuras and SpellInfo:GetSpellSpecific are newer than some mod-ale
+-- builds; without them (or on any error) nobody counts as eating, which is
+-- how the script behaved before.
+local function IsEating(player)
+    if not player.GetAuras then
+        return false
+    end
+    local ok, eating = pcall(FindFood, player)
+    if not ok then
+        if not eatingErrorShown then
+            eatingErrorShown = true
+            print("SitMeansRest food check error: " .. tostring(eating))
+        end
+        return false
+    end
+    return eating
+end
+
+-- The player sat down to eat or drink: leave them to it. Phase "done" keeps
+-- the buff from coming back until they stand up, as after a full rest.
+local function YieldToFood(player)
+    local g = player:GetGUIDLow()
+    local state = rest[g]
+    if state and state.eventId then
+        player:RemoveEventById(state.eventId)
+    end
+    rest[g] = { phase = "done" }
+end
+
 local function RestMovementCheck(eventId, delay, repeats, player)
     if not player then
         return
@@ -76,6 +127,14 @@ local function RestMovementCheck(eventId, delay, repeats, player)
 
     local g = player:GetGUIDLow()
     local state = rest[g]
+
+    -- Food or drink taken mid-rest has already replaced the regen aura.
+    if state and state.phase == "resting" and not player:HasAura(CONFIG.REGEN_AURA)
+       and IsEating(player) then
+        YieldToFood(player)
+        return
+    end
+
     if not state or state.phase ~= "resting" or not player:HasAura(CONFIG.REGEN_AURA) then
         StopResting(player)
         return
@@ -100,6 +159,11 @@ end
 local function StartResting(player)
     if player:IsInCombat() then
         player:SendBroadcastMessage("You can't rest while in combat!")
+        return
+    end
+
+    if IsEating(player) then
+        YieldToFood(player)
         return
     end
 
